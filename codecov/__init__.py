@@ -597,7 +597,7 @@ def main(*argv, **kwargs):
                 if _slug:
                     query['slug'] = _slug.groups()[1]
 
-        assert query.get('job') or query.get('token'), "Missing repository upload token"
+        #assert query.get('job') or query.get('token'), "Missing repository upload token"
 
         # Processing gcov
         # ---------------
@@ -618,6 +618,7 @@ def main(*argv, **kwargs):
         # ---------------
         write('==> Collecting reports')
         reports = []
+        report_paths = set()
 
         if 'search' in codecov.disable:
             write('XX> Searching for reports disabled')
@@ -646,6 +647,7 @@ def main(*argv, **kwargs):
                         if not codecov.file and is_report(fullpath.replace('\\', '/')) and not ignored_report(fullpath.replace('\\', '/')):
                             # found report
                             reports.append(read(fullpath))
+                            report_paths.add(filepath)
 
         # Read Reports
         # ------------
@@ -657,15 +659,18 @@ def main(*argv, **kwargs):
             # Call `coverage xml` when .coverage exists
             # -----------------------------------------
             # Ran from current directory
-            if os.path.exists(opj(os.getcwd(), '.coverage')) and not os.path.exists(opj(os.getcwd(), 'coverage.xml')):
-                if glob.glob(opj(os.getcwd(), '.coverage.*')):
+
+            if (all(os.path.exists(opj(os.getcwd(), report_path)) for report_path in report_paths)
+                    and not os.path.exists(opj(os.getcwd(), 'coverage.xml'))):
+                if len(report_paths) > 1:
                     write('    Mergeing coverage reports')
                     try_to_run('coverage combine')
 
                 write('    Generating coverage xml reports for Python')
                 # using `-i` to ignore "No source for code" error
-                try_to_run('coverage xml -i')
+                try_to_run("coverage xml -i")
                 reports.append(read(opj(os.getcwd(), 'coverage.xml')))
+                reports = reports[len(report_paths):]
 
         reports = list(filter(bool, reports))
         assert len(reports) > 0, "No coverage report found"
